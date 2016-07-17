@@ -15,9 +15,10 @@ class DependencyGraph(object):
         self._node_names = dict()
 
     def add_dependency(self, dependent, dependency):
-        self._adjacencies[dependent].add(dependency)
-        self._nodes.add(dependent)
-        self._nodes.add(dependency)
+        if dependent != dependency: # Avoid cycles
+            self._adjacencies[dependent].add(dependency)
+            self._nodes.add(dependent)
+            self._nodes.add(dependency)
 
     def add_custom_name(self, node_label, name):
         self._node_names[node_label] = name

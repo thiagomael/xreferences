@@ -35,9 +35,9 @@ class DependencyGraph(object):
         new_graph._node_names = {label: name for label, name in self._node_names.iteritems() if label in nodes}
         return new_graph
 
-    def to_dot(self):
+    def to_dot(self, label_processor=lambda _,x:x):
         nodes = {node: "n"+str(i) for i, node in enumerate(self._nodes)}
-        nodes_declaration = ['%s [texlbl="%s"];' % (id_, self._make_dot_label(node)) for node, id_ in nodes.iteritems()]
+        nodes_declaration = ['%s [texlbl="%s"];' % (id_, self._make_dot_label(node, label_processor)) for node, id_ in nodes.iteritems()]
 
         exploded_dependencies = chain(*[product([dependent], dependencies) for dependent, dependencies in self._adjacencies.iteritems()])
         edges = ['%s -> %s;' % (nodes[dependent], nodes[dependency]) for dependent, dependency in exploded_dependencies]
@@ -63,10 +63,11 @@ digraph d {
             nodes.update(self._visit(adjacency))
         return nodes
 
-    def _make_dot_label(self, node_tex_label):
+    def _make_dot_label(self, node_tex_label, label_processor):
         custom_label = self._node_names.get(node_tex_label)
         if custom_label is not None:
-            return r"\hyperref[%s]{%s}" % (node_tex_label, custom_label)
+            processed = label_processor(node_tex_label, custom_label)
+            return r"\hyperref[%s]{%s}" % (node_tex_label, processed)
             #return r"\Cref{%s}" % node_tex_label
         else:
             return r"\nameref{%s}" % node_tex_label
@@ -200,6 +201,15 @@ def dump(graph_dot, label):
         out.write(tikz_output % graph_dot)
 
 
+def _make_label_colorizer(colors_by_prefixes):
+    def label_colorizer(node_ref, label):
+        for prefix in colors_by_prefixes:
+            if node_ref.startswith(prefix):
+                return r"\textcolor{%s}{%s}" % (colors_by_prefixes[prefix], label)
+        return label
+    return label_colorizer
+
+
 import fileinput
 
 # Configuration
@@ -215,6 +225,11 @@ reference_prefixes = ["theorem:",
                       "lemma:",
                       "corollary:",
                       "def:"]
+
+colors_by_prefixes = {"theorem:": "TheoremColor",
+                      "lemma:": "LemmaColor",
+                      "corollary:": "CorollaryColor",
+                      "def:": "DefinitionColor"}
 #------------------------------------------------
 
 if __name__ == '__main__':
@@ -227,7 +242,9 @@ if __name__ == '__main__':
             "theorem:family-soundness",
             "theorem:feature-family-product-soundness"]
 
+    label_colorizer = _make_label_colorizer(colors_by_prefixes)
+
     dg = parse_tex(fileinput.input(tex_files))  # Concatenate files as if they were a single one
-    dump(dg.to_dot(), "theory-structure")
+    dump(dg.to_dot(label_colorizer), "theory-structure")
     for subgraph_label in subgraphs:
-        dump(dg.subgraph(subgraph_label).to_dot(), subgraph_label)
+        dump(dg.subgraph(subgraph_label).to_dot(label_colorizer), subgraph_label)

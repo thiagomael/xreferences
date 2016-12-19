@@ -13,12 +13,19 @@ class DependencyGraph(object):
         self._adjacencies = defaultdict(set)
         self._nodes = set()
         self._node_names = dict()
+        self._node_bodies = defaultdict(str)
+        self._order = list()
 
     def add_dependency(self, dependent, dependency):
         if dependent != dependency: # Avoid cycles
             self._adjacencies[dependent].add(dependency)
             self._nodes.add(dependent)
             self._nodes.add(dependency)
+
+    def add_content(self, node_label, content):
+        self._node_bodies[node_label] += content
+        if node_label not in self._order:
+            self._order.append(node_label)
 
     def add_custom_name(self, node_label, name):
         self._node_names[node_label] = name
@@ -55,6 +62,23 @@ digraph d {
         '''
         return dot_template % ('\n'.join(nodes_declaration),
                                '\n'.join(edges))
+
+    def to_tabular_rows(self, prefix, add_references):
+        node_labels = filter(lambda label: label.startswith(prefix),
+                             self._order)
+        rows = []
+        for label in node_labels:
+            this = self._make_references([label])
+            body = self._node_bodies[label]
+            row = this + " & " + body
+            if add_references:
+                references = self._make_references(self._adjacencies[label])
+                row += " & " + references
+            rows.append(row + r" \\")
+        return "\n\hline\n".join(rows)
+
+    def _make_references(self, adjacencies):
+        return r"\Cref{%s}" % ",".join(adjacencies)
 
     def _visit(self, label):
         nodes = set([label])
@@ -116,6 +140,7 @@ def parse_scope_end(line, dependency_graph, scope_type, label):
     references = _parse_references(line, list())
     for reference in references:
         dependency_graph.add_dependency(label, reference)
+    dependency_graph.add_content(label, line)
     return None
 
 

@@ -278,7 +278,7 @@ def _parse_args():
         - output: dot|table.
         - config: configuration file object.
     '''
-    parser = argparse.ArgumentParser(description="Run ReAna's strategies for a number of SPLs.")
+    parser = argparse.ArgumentParser(description="Parse LaTeX files and track cross-references.")
     parser.add_argument('--output',
                         dest='output',
                         action='store',

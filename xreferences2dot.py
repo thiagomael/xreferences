@@ -235,41 +235,78 @@ def _make_label_colorizer(colors_by_prefixes):
     return label_colorizer
 
 
-import fileinput
-
 # Configuration
-#------------------------------------------------
-
 # We search from \begin{<key>} until \end{<value>}.
-scope_delimiters = {"theorem": "proof",
-                    "lemma": "proof",
-                    "corollary": "corollary",
-                    "definition": "definition"}
-
-reference_prefixes = ["theorem:",
-                      "lemma:",
-                      "corollary:",
-                      "def:"]
-
-colors_by_prefixes = {"theorem:": "TheoremColor",
-                      "lemma:": "LemmaColor",
-                      "corollary:": "CorollaryColor",
-                      "def:": "DefinitionColor"}
+scope_delimiters = None
+reference_prefixes = None
 #------------------------------------------------
+
+from collections import namedtuple
+import json
+
+Configuration = namedtuple('Configuration',
+                           ['scope_delimiters',
+                            'reference_prefixes',
+                            'colors_by_prefixes',
+                            'tex_files',
+                            'subgraphs',
+                            'table_files'])
+
+def _parse_configuration(config_file):
+    global scope_delimiters
+    global reference_prefixes
+
+    raw_config = json.load(config_file)
+
+    scope_delimiters = raw_config['scope_delimiters']
+    reference_prefixes = raw_config['reference_prefixes']
+    return Configuration(scope_delimiters=scope_delimiters,
+                         reference_prefixes=reference_prefixes,
+                         colors_by_prefixes=raw_config['colors_by_prefixes'],
+                         tex_files=raw_config['tex_files'],
+                         subgraphs=raw_config['subgraphs'],
+                         table_files=raw_config['table_files'])
+
+import argparse
+import fileinput
+import codecs
+
+def _parse_args():
+    '''
+    Parses command-line args.
+    Return object:
+        - output: dot|table.
+        - config: configuration file object.
+    '''
+    parser = argparse.ArgumentParser(description="Run ReAna's strategies for a number of SPLs.")
+    parser.add_argument('--output',
+                        dest='output',
+                        action='store',
+                        required=True,
+			choices=['dot', 'table'],
+                        help="Output mode: do you want to generate DOT files or LaTeX tables?")
+    parser.add_argument('--config',
+                        dest='config_file',
+                        action='store',
+                        required=True,
+                        type=file,
+                        help="Configuration file.")
+    return parser.parse_args()
 
 if __name__ == '__main__':
-    # Ideally, these should come as command-line arguments.
-    tex_files = ["/home/thiago/Projects/papers/reana-spl/main.tex"]
-    subgraphs = [
-            "theorem:feature-family-soundness",
-            "theorem:feature-product-soundness",
-            "theorem:family-product-soundness",
-            "theorem:family-soundness",
-            "theorem:feature-family-product-soundness"]
+    args = _parse_args()
+    configs = _parse_configuration(args.config_file)
 
-    label_colorizer = _make_label_colorizer(colors_by_prefixes)
+    label_colorizer = _make_label_colorizer(configs.colors_by_prefixes)
 
-    dg = parse_tex(fileinput.input(tex_files))  # Concatenate files as if they were a single one
-    dump(dg.to_dot(label_colorizer), "theory-structure")
-    for subgraph_label in subgraphs:
-        dump(dg.subgraph(subgraph_label).to_dot(label_colorizer), subgraph_label)
+    # Concatenate files as if they were a single one
+    dg = parse_tex(fileinput.input(configs.tex_files,
+                                   openhook=fileinput.hook_encoded("utf-8")))
+    if args.output == 'dot':
+        dump(dg.to_dot(label_colorizer), "theory-structure")
+        for subgraph_label in configs.subgraphs:
+            dump(dg.subgraph(subgraph_label).to_dot(label_colorizer), subgraph_label)
+    elif args.output == 'table':
+        for reference, table_file_conf in configs.table_files.iteritems():
+            with codecs.open(table_file_conf['name'], 'w', encoding="utf-8") as out:
+                out.write(dg.to_tabular_rows(reference, add_references=table_file_conf['add_references']))

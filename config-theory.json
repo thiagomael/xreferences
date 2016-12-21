@@ -1,0 +1,31 @@
+{
+    "scope_delimiters": {
+        "theorem": "proof",
+        "lemma": "proof",
+        "corollary": "corollary",
+        "definition": "definition"
+    },
+    "reference_prefixes": [
+        "theorem:",
+        "lemma:",
+        "corollary:",
+        "def:"
+    ],
+    "colors_by_prefixes": {
+        "theorem:": "TheoremColor",
+        "lemma:": "LemmaColor",
+        "corollary:": "CorollaryColor",
+        "def:": "DefinitionColor"
+    },
+    "tex_files": [
+        "/home/thiago/Projects/papers/reana-spl/main.tex"
+    ],
+    "subgraphs": [
+        "theorem:feature-family-soundness",
+        "theorem:feature-product-soundness",
+        "theorem:family-product-soundness",
+        "theorem:family-soundness",
+        "theorem:feature-family-product-soundness"
+    ],
+    "table_files": {}
+}

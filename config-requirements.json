@@ -1,0 +1,29 @@
+{
+    "scope_delimiters": {
+        "business-requirement": "business-requirement",
+        "architecture-requirement": "architecture-requirement"
+    },
+    "reference_prefixes": [
+        "req:",
+        "req-arq:"
+    ],
+    "colors_by_prefixes": {
+        "req:": "green",
+        "req-arq:": "cyan"
+    },
+    "tex_files": [
+        "/home/castro/Projects/sosc2fter/docs/diretrizes/src/3/main.tex",
+        "/home/castro/Projects/sosc2fter/docs/diretrizes/src/4/main.tex"
+    ],
+    "subgraphs": [],
+    "table_files": {
+        "req": {
+            "name": "business-requirements.tex",
+            "add_references": false
+        },
+        "req-arq": {
+            "name": "architecture-requirements.tex",
+            "add_references": true
+        }
+    }
+}

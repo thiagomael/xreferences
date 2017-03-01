@@ -13,7 +13,7 @@ class DependencyGraph(object):
         self._adjacencies = defaultdict(set)
         self._nodes = set()
         self._node_names = dict()
-        self._node_bodies = defaultdict(str)
+        self._node_bodies = defaultdict(unicode)
         self._order = list()
 
     def add_dependency(self, dependent, dependency):
@@ -118,7 +118,7 @@ def parse_scope_begin(line, dependency_graph):
     scope_type = _parse_scope_type(line)
     if scope_type is not None:
         scope_description = _parse_scope_description(line)
-        log("Beginning scope " + scope_type + str(scope_description))
+        log(u"Beginning scope " + scope_type + unicode(scope_description))
         return lambda l, dg: parse_scope_label(l, dg, scope_type, scope_description)
     return None
 

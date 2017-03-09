@@ -299,6 +299,8 @@ if __name__ == '__main__':
 
     label_colorizer = _make_label_colorizer(configs.colors_by_prefixes)
 
+    if len(configs.tex_files) == 0:
+        exit()
     # Concatenate files as if they were a single one
     dg = parse_tex(fileinput.input(configs.tex_files,
                                    openhook=fileinput.hook_encoded("utf-8")))

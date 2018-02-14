@@ -4,98 +4,9 @@
 Script to extract cross-references in a LaTeX document.
 """
 
-from collections import defaultdict
-from itertools import chain, product
+from dependency_graph import *
 
-
-class DependencyGraph(object):
-    def __init__(self):
-        self._adjacencies = defaultdict(set)
-        self._nodes = set()
-        self._node_names = dict()
-        self._node_bodies = defaultdict(unicode)
-        self._order = list()
-
-    def add_dependency(self, dependent, dependency):
-        if dependent != dependency: # Avoid cycles
-            self._adjacencies[dependent].add(dependency)
-            self._nodes.add(dependent)
-            self._nodes.add(dependency)
-
-    def add_content(self, node_label, content):
-        self._node_bodies[node_label] += content
-        if node_label not in self._order:
-            self._order.append(node_label)
-
-    def add_custom_name(self, node_label, name):
-        self._node_names[node_label] = name
-
-    def subgraph(self, label):
-        """
-        Returns a new DependencyGraph without nodes unreachable from
-        the one whose label is passed as an argument.
-        """
-        nodes = self._visit(label)
-        new_graph = DependencyGraph()
-        new_graph._adjacencies.update({node: self._adjacencies[node] for node in nodes})
-        new_graph._nodes.update(nodes)
-        new_graph._node_names = {label: name for label, name in self._node_names.iteritems() if label in nodes}
-        return new_graph
-
-    def to_dot(self, label_processor=lambda _,x:x):
-        nodes = {node: "n"+str(i) for i, node in enumerate(self._nodes)}
-        nodes_declaration = ['%s [texlbl="%s"];' % (id_, self._make_dot_label(node, label_processor)) for node, id_ in nodes.iteritems()]
-
-        exploded_dependencies = chain(*[product([dependent], dependencies) for dependent, dependencies in self._adjacencies.iteritems()])
-        edges = ['%s -> %s;' % (nodes[dependent], nodes[dependency]) for dependent, dependency in exploded_dependencies]
-
-        dot_template = r'''
-digraph d {
-    node [shape="none"];
-    overlap="prism";
-    ratio="auto";
-    
-    %s
-    
-    %s
-}
-        '''
-        return dot_template % ('\n'.join(nodes_declaration),
-                               '\n'.join(edges))
-
-    def to_tabular_rows(self, prefix, add_references):
-        node_labels = filter(lambda label: label.startswith(prefix),
-                             self._order)
-        rows = []
-        for label in node_labels:
-            this = self._make_references([label])
-            body = self._node_bodies[label]
-            row = this + " & " + body
-            if add_references:
-                references = self._make_references(self._adjacencies[label])
-                row += " & " + references
-            rows.append(row + r" \\")
-        return "\n\hline\n".join(rows)
-
-    def _make_references(self, adjacencies):
-        return r"\Cref{%s}" % ",".join(adjacencies)
-
-    def _visit(self, label):
-        nodes = set([label])
-        adjacencies = self._adjacencies[label]
-        for adjacency in adjacencies:
-            nodes.update(self._visit(adjacency))
-        return nodes
-
-    def _make_dot_label(self, node_tex_label, label_processor):
-        custom_label = self._node_names.get(node_tex_label)
-        if custom_label is not None:
-            processed = label_processor(node_tex_label, custom_label)
-            return r"\hyperref[%s]{%s}" % (node_tex_label, processed)
-            #return r"\Cref{%s}" % node_tex_label
-        else:
-            return r"\nameref{%s}" % node_tex_label
-
+from collections import namedtuple
 
 # Parser :: line -> DependencyGraph -> Parser
 
@@ -114,11 +25,23 @@ def parse_tex(lines):
     return dependency_graph
 
 
+def parse_scope_or_restatement(line, dependency_graph):
+    # If we find a restatement, we need to search for further dependencies
+    for macro, restatable in _get_restatables():
+        if (r'\%s' % macro ) in line:
+            log(u"Re-opening restatable "+restatable.label)
+            return lambda l, dg: parse_scope_end(l, dg, restatable.type, restatable.label)
+    # Otherwise, we treat the line as a possible scope beginning
+    return parse_scope_begin(line, dependency_graph)
+
+
 def parse_scope_begin(line, dependency_graph):
     scope_type = _parse_scope_type(line)
     if scope_type is not None:
         scope_description = _parse_scope_description(line)
         log(u"Beginning scope " + scope_type + unicode(scope_description))
+        if scope_type == "restatable":
+            _prepare_restatable(_parse_restatable_type(line), _parse_restatable_macro(line))
         return lambda l, dg: parse_scope_label(l, dg, scope_type, scope_description)
     return None
 
@@ -129,6 +52,8 @@ def parse_scope_label(line, dependency_graph, scope_type, scope_description):
         raise Exception("A scope must always be followed by a label")
     log("Scope label: " + label)
     dependency_graph.add_custom_name(label, scope_description)
+    if scope_type == "restatable":
+        _record_restatable(label)
     return lambda l, dg: parse_scope_end(l, dg, scope_type, label)
 
 
@@ -139,6 +64,7 @@ def parse_scope_end(line, dependency_graph, scope_type, label):
 
     references = _parse_references(line, list())
     for reference in references:
+        log(u"%s depends on %s" % (label, reference))
         dependency_graph.add_dependency(label, reference)
     dependency_graph.add_content(label, line)
     return None
@@ -171,7 +97,10 @@ def _parse_references(line, references_so_far):
         stop = _min_valid_index(line.find(',', first),
                                 line.find('}', first))
         reference = line[first:stop]
-        references_so_far.append(reference)
+        # Let us get rid of occurrences that are just regular sentences
+        # ending with a colon (e.g., "the following property:")
+        if not reference.endswith(':'):
+            references_so_far.append(reference)
         return _parse_references(line[stop:], references_so_far)
     return references_so_far
 
@@ -204,8 +133,55 @@ def _parse_between(line, left_delimiter, right_delimiter):
     close_brace = line.find(right_delimiter, open_brace)
     return line[open_brace+1:close_brace]
 
-default_parser = parse_scope_begin
 
+default_parser = parse_scope_or_restatement
+
+
+############################
+# Restatable-specific code
+############################
+
+_tmp_restatement_type = None
+_tmp_restatement_macro = None
+
+# Tuple for properties of restatable theorems
+Restatable = namedtuple("Restatable", ["label", "type"])
+
+# Mapping of restatement macros to corresponding restatable properties
+restatables = dict()
+
+
+def _prepare_restatable(restatement_type, restatement_macro):
+    global _tmp_restatement_type
+    global _tmp_restatement_macro
+    _tmp_restatement_type = restatement_type
+    _tmp_restatement_macro = restatement_macro
+
+
+def _record_restatable(restatement_label):
+    global _tmp_restatement_type
+    global _tmp_restatement_macro
+    restatables[_tmp_restatement_macro] = Restatable(restatement_label, _tmp_restatement_type)
+    _tmp_restatement_type = None
+    _tmp_restatement_macro = None
+
+
+def _get_restatables():
+    return restatables.iteritems()
+
+
+def _parse_restatable_type(line):
+    last_bracket = line.find(']')
+    return _parse_brace_content(line[last_bracket:])
+
+
+def _parse_restatable_macro(line):
+    last_opening_brace = line.rfind('{')
+    return _parse_brace_content(line[last_opening_brace:])
+
+############################
+# Presentation-specific code
+############################
 
 def dump(graph_dot, label):
     tikz_output = r"""
@@ -213,7 +189,7 @@ def dump(graph_dot, label):
         align=center,
         text centered,
         text width=80pt]
-    \small
+    \fontsize{9}{10.8}
     \begin{dot2tex}[dot, codeonly]
 
         %s
@@ -306,6 +282,8 @@ if __name__ == '__main__':
                                    openhook=fileinput.hook_encoded("utf-8")))
     if args.output == 'dot':
         dump(dg.to_dot(label_colorizer), "theory-structure")
+        dump(dg.filtered(["def:", "property:", "strategy:"]).to_dot(label_colorizer), "theory-structure-definitions")
+        dump(dg.filtered(["theorem:", "lemma:", "corollary:"]).to_dot(label_colorizer), "theory-structure-theorems")
         for subgraph_label in configs.subgraphs:
             dump(dg.subgraph(subgraph_label).to_dot(label_colorizer), subgraph_label)
     elif args.output == 'table':

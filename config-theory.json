@@ -2,23 +2,31 @@
     "scope_delimiters": {
         "theorem": "proof",
         "lemma": "proof",
+        "restatable": "proof",
         "corollary": "corollary",
-        "definition": "definition"
+        "definition": "definition",
+        "strategy": "strategy",
+        "property": "property"
     },
     "reference_prefixes": [
         "theorem:",
         "lemma:",
         "corollary:",
-        "def:"
+        "def:",
+        "property:"
     ],
     "colors_by_prefixes": {
         "theorem:": "TheoremColor",
         "lemma:": "LemmaColor",
         "corollary:": "CorollaryColor",
-        "def:": "DefinitionColor"
+        "def:": "DefinitionColor",
+        "property": "DefinitionColor"
     },
     "tex_files": [
-        "/home/thiago/Projects/papers/reana-spl/main.tex"
+        "/home/thiago/Projects/papers/reana-spl/scp/content/background.tex",
+        "/home/thiago/Projects/papers/reana-spl/scp/content/models.tex",
+        "/home/thiago/Projects/papers/reana-spl/scp/content/strategies.tex",
+        "/home/thiago/Projects/papers/reana-spl/scp/content/appendix/proofs.tex"
     ],
     "subgraphs": [
         "theorem:feature-family-soundness",

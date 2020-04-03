@@ -23,10 +23,10 @@
         "property": "DefinitionColor"
     },
     "tex_files": [
-        "/home/thiago/Projects/papers/reana-spl/scp/content/background.tex",
-        "/home/thiago/Projects/papers/reana-spl/scp/content/models.tex",
-        "/home/thiago/Projects/papers/reana-spl/scp/content/strategies.tex",
-        "/home/thiago/Projects/papers/reana-spl/scp/content/appendix/proofs.tex"
+        "/home/thiago/Projects/papers/reana-spl/thesis/chapters/paper/background.tex",
+        "/home/thiago/Projects/papers/reana-spl/thesis/chapters/paper/models.tex",
+        "/home/thiago/Projects/papers/reana-spl/thesis/chapters/paper/strategies.tex",
+        "/home/thiago/Projects/papers/reana-spl/thesis/chapters/paper/appendix/proofs.tex"
     ],
     "subgraphs": [
         "theorem:feature-family-soundness",

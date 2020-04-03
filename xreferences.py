@@ -280,6 +280,9 @@ if __name__ == '__main__':
     # Concatenate files as if they were a single one
     dg = parse_tex(fileinput.input(configs.tex_files,
                                    openhook=fileinput.hook_encoded("utf-8")))
+    print "==============================>"
+    dg.dump_labels_as_table_rows()
+    print "==============================>"
     if args.output == 'dot':
         dump(dg.to_dot(label_colorizer), "theory-structure")
         dump(dg.filtered(["def:", "property:", "strategy:"]).to_dot(label_colorizer), "theory-structure-definitions")

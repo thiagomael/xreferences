@@ -109,3 +109,10 @@ digraph d {
             #return r"\Cref{%s}" % node_tex_label
         else:
             return r"\nameref{%s}" % node_tex_label
+
+    def dump_labels_as_table_rows(self):
+        labels = self._order
+        for label in labels:
+            print r"""\fullref{%s}
+& \repolink{}{}{}
+\\""" % label
